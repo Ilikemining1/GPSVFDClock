@@ -19,12 +19,12 @@ LiquidCrystal vfd(vfdRS, vfdEN, vfdD4, vfdD5, vfdD6, vfdD7);
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 int initializeVFD() {
-  Serial.println("VFD: initializing")
+  Serial.println("VFD: initializing");
   vfd.begin(40, 2);
   vfd.setCursor(11, 0);
   vfd.print("VFD Initialized!");
   delay(500);
-  vfd.clear()
+  vfd.clear();
   vfd.setCursor(0, 0);
   return 0;
 }
@@ -45,7 +45,7 @@ int initalizeGNSS() {
       ubxGNSS.setSerialRate(115200);
       delay(100);
      } else {
-      Serial.println("GNSS: Failed to initialize, retrying")
+      Serial.println("GNSS: Failed to initialize, retrying");
       initCount++;
       delay(1000);
      }
