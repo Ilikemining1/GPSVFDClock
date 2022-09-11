@@ -19,7 +19,7 @@ LiquidCrystal vfd(vfdRS, vfdEN, vfdD4, vfdD5, vfdD6, vfdD7);
 DateTime now;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-char monthsOfTheYear[12][12] = {"January", "Febuary" "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
 int initializeVFD() {
   Serial.println("VFD: initializing");
