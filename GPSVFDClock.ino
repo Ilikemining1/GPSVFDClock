@@ -95,7 +95,7 @@ const char *formattedTimeString() {
   if (now.hour() > 12) {
     amPm = "PM";
   } else {
-    amPM = "AM";
+    amPm = "AM";
   }
 
   int numBytes = sprintf(NULL, 0, "%s %s %02d, %04d %02d:%02d:%02d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month()], now.year(), now.twelveHour(), now.minute(), now.second(), amPm) + 1;
