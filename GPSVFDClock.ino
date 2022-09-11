@@ -23,7 +23,7 @@ int initializeVFD() {
   vfd.begin(40, 2);
   vfd.setCursor(11, 0);
   vfd.print("VFD Initialized!");
-  delay(500);
+  delay(1000);
   vfd.clear();
   vfd.setCursor(0, 0);
   return 0;
@@ -91,9 +91,9 @@ int initalizeRTC() {
 void setup() {
   Serial.begin(115200);
   Serial.println("GPS VFD Clock Mk1");
-  Serial.printf("VFD: init status %d", initializeVFD());
-  Serial.printf("GNSS: init status %d", initalizeGNSS());
-  Serial.printf("RTC: init status %d", initalizeRTC());
+  Serial.printf("VFD: init status %d\n", initializeVFD());
+  Serial.printf("GNSS: init status %d\n", initalizeGNSS());
+  Serial.printf("RTC: init status %d\n", initalizeRTC());
 
 }
 
