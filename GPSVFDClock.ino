@@ -98,9 +98,9 @@ const char *formattedTimeString() {
     amPm = "AM";
   }
 
-  int numBytes = sprintf(NULL, 0, "%s %s %02d, %04d %02d:%02d:%02d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month()], now.year(), now.twelveHour(), now.minute(), now.second(), amPm) + 1;
+  int numBytes = snprintf(NULL, 0, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month()], now.day(), now.year(), now.twelveHour(), now.minute(), now.second(), amPm) + 1;
   char *timeString = (char*)malloc(numBytes);
-  sprintf(timeString, 0, "%s %s %02d, %04d %02d:%02d:%02d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month()], now.year(), now.twelveHour(), now.minute(), now.second(), amPm);
+  snprintf(timeString, numBytes, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month()], now.day(), now.year(), now.twelveHour(), now.minute(), now.second(), amPm);
 
   return timeString;
 }
