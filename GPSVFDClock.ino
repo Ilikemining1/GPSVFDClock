@@ -16,7 +16,10 @@ RTC_DS3231 rtc;
 SFE_UBLOX_GNSS ubxGNSS;
 LiquidCrystal vfd(vfdRS, vfdEN, vfdD4, vfdD5, vfdD6, vfdD7);
 
+DateTime now;
+
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+char monthsOfTheYear[12][12] = {"January", "Febuary" "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
 int initializeVFD() {
   Serial.println("VFD: initializing");
@@ -87,6 +90,20 @@ int initalizeRTC() {
   return 0;
 }
 
+const char *formattedTimeString() {
+  char *amPm;
+  if (now.hour() > 12) {
+    amPm = "PM";
+  } else {
+    amPM = "AM";
+  }
+
+  int numBytes = sprintf(NULL, 0, "%s %s %02d, %04d %02d:%02d:%02d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month()], now.year(), now.twelveHour(), now.minute(), now.second(), amPm) + 1;
+  char *timeString = malloc(numBytes);
+  sprintf(timeString, 0, "%s %s %02d, %04d %02d:%02d:%02d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month()], now.year(), now.twelveHour(), now.minute(), now.second(), amPm);
+
+  return timeString;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -95,8 +112,16 @@ void setup() {
   Serial.printf("GNSS: init status %d\n", initalizeGNSS());
   Serial.printf("RTC: init status %d\n", initalizeRTC());
 
+  Serial.println("SYS: Setting current time from RTC");
+  now = rtc.now();
+  Serial.printf("SYS: time is now %s\n", formattedTimeString());
 }
 
 void loop() {
+
+  now = rtc.now();
+  vfd.print(formattedTimeString());
+  vfd.setCursor(0, 0);
+  delay(100);
 
 }
