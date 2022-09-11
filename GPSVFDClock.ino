@@ -91,7 +91,7 @@ int initalizeRTC() {
 void setup() {
   Serial.begin(115200);
   Serial.println("GPS VFD Clock Mk1");
-  Serial.printf("VFD: init status %d", initalizeVFD());
+  Serial.printf("VFD: init status %d", initializeVFD());
   Serial.printf("GNSS: init status %d", initalizeGNSS());
   Serial.printf("RTC: init status %d", initalizeRTC());
 
