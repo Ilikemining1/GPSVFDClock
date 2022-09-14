@@ -59,7 +59,6 @@ int initalizeGNSS() {
   }
   if (initCount < 5) {
     Serial.println("GNSS: connected to UBX module at 115200 baud");
-    vfd.print("GNSS: UBX module intialized!");
     ubxGNSS.setUART1Output(COM_TYPE_UBX);
     ubxGNSS.saveConfiguration();
     return 0;
@@ -83,7 +82,6 @@ int initalizeRTC() {
   }
   if (initCount < 5) {
     Serial.println("RTC: initalized successfully!");
-    vfd.print("RTC: RTC initalized!");
   } else {
     return -1;
   }
@@ -151,7 +149,7 @@ void loop() {
   vfd.setCursor(0, 0);
   vfd.print(formattedTimeString());
   vfd.setCursor(0, 1);
-  vfd.printf("RTC PPS: %d GPS PPS: %d\n", rtcPulseCount, gpsPulseCount);
+  vfd.printf("RTC PPS: %d GPS PPS: %d", rtcPulseCount, gpsPulseCount);
   delay(100);
 
 }
