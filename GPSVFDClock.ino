@@ -138,7 +138,7 @@ void setup() {
   Serial.printf("VFD: init status %d\n", initializeVFD());
   Serial.printf("GNSS: init status %d\n", initalizeGNSS());
   Serial.printf("RTC: init status %d\n", initalizeRTC());
-  Seria.printf("SYS: io init status %d\n", initalizeIO());
+  Serial.printf("SYS: io init status %d\n", initializeIO());
 
   Serial.println("SYS: Setting current time from RTC");
   now = rtc.now();
