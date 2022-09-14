@@ -159,9 +159,11 @@ void loop() {
     currentTime = ubxGNSS.getUnixEpoch();
     rtc.adjust(DateTime(currentTime));
     initializeInterrupts(true);
+    usingGpsPPS = true;
   } else {
     timeSource = "RTC";
     initializeInterrupts(false);
+    usingGpsPPS = false;
   }
 
   vfd.printf("Fix Type: %d SIV: %d Time Source: %s", ubxGNSS.getFixType(), ubxGNSS.getSIV(), timeSource);
