@@ -26,6 +26,7 @@ char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
 bool usingGpsPPS = false;
+char *timeSource = "RTC";
 
 int initializeVFD() {
   Serial.println("VFD: initializing");
@@ -102,10 +103,7 @@ void IRAM_ATTR rtcTimepulse() {
   currentTime++;
 }
 
-int initializeInterrupts(bool useGps) {
-  pinMode(ubxPPS, INPUT);
-  pinMode(rtcPPS, INPUT_PULLUP);
-
+int changeInterrupts(bool useGps) {
   if (useGps == true) {
     detachInterrupt(rtcPPS);
     attachInterrupt(ubxPPS, gpsTimepulse, RISING);
@@ -136,6 +134,10 @@ const char *formattedTimeString() {
 
 void setup() {
   Serial.begin(115200);
+
+  pinMode(ubxPPS, INPUT);
+  pinMode(rtcPPS, INPUT_PULLUP);
+  
   Serial.println("SYS: VFD GPS Clock initializing...");
   Serial.printf("VFD: init status %d\n", initializeVFD());
   Serial.printf("GNSS: init status %d\n", initializeGNSS());
@@ -143,30 +145,31 @@ void setup() {
 
   Serial.println("SYS: Setting current time from RTC");
   currentTime = rtc.now().unixtime();
-  initializeInterrupts(false);
+  attachInterrupt(rtcPPS, rtcTimepulse, FALLING);
   Serial.printf("SYS: time is now %s, RTC interrupts enabled\n", formattedTimeString());
 }
 
 void loop() {
-  char *timeSource;
-
+  int fixType = ubxGNSS.getFixType();
+  int siv = ubxGNSS.getSIV();
+  
   vfd.setCursor(0, 0);
   vfd.print(formattedTimeString());
   vfd.setCursor(0, 1);
+  vfd.printf("Fix Type: %d SIV: %d Time Source: %s", fixType, siv, timeSource);
 
-  if((ubxGNSS.getFixType() == 2 || ubxGNSS.getFixType() == 3) && !usingGpsPPS && ubxGNSS.getTimeValid()) {
+
+ if(!usingGpsPPS && (fixType > 0)) {
     timeSource = "GPS";
     currentTime = ubxGNSS.getUnixEpoch();
     rtc.adjust(DateTime(currentTime));
-    initializeInterrupts(true);
+    changeInterrupts(true);
     usingGpsPPS = true;
-  } else {
+  } else if(usingGpsPPS && (fixType < 1)) {
     timeSource = "RTC";
-    initializeInterrupts(false);
+    changeInterrupts(false);
     usingGpsPPS = false;
   }
 
-  vfd.printf("Fix Type: %d SIV: %d Time Source: %s", ubxGNSS.getFixType(), ubxGNSS.getSIV(), timeSource);
-
-  delay(100);
+  delay(10);
 }
