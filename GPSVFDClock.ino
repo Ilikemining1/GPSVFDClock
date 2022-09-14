@@ -94,7 +94,7 @@ int initalizeRTC() {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
-  rtc.enableSecondTimer();
+  rtc.writeSqwPinMode(DS3231_SquareWave1Hz);
 
   return 0;
 }
