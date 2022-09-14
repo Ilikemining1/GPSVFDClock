@@ -5,6 +5,9 @@
 #define ubxRX 16
 #define ubxTX 17
 
+#define ubxPPS 18
+#define rtcPPS 19
+
 #define vfdRS 23
 #define vfdEN 25
 #define vfdD4 26
@@ -21,14 +24,15 @@ DateTime now;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
+volatile int rtcPulseCount = 0;
+volatile int gpsPulseCount = 0;
+
 int initializeVFD() {
   Serial.println("VFD: initializing");
   vfd.begin(40, 2);
-  vfd.setCursor(11, 0);
   vfd.print("VFD Initialized!");
   delay(1000);
   vfd.clear();
-  vfd.setCursor(0, 0);
   return 0;
 }
 
@@ -55,6 +59,7 @@ int initalizeGNSS() {
   }
   if (initCount < 5) {
     Serial.println("GNSS: connected to UBX module at 115200 baud");
+    vfd.print("GNSS: UBX module intialized!");
     ubxGNSS.setUART1Output(COM_TYPE_UBX);
     ubxGNSS.saveConfiguration();
     return 0;
@@ -78,14 +83,36 @@ int initalizeRTC() {
   }
   if (initCount < 5) {
     Serial.println("RTC: initalized successfully!");
+    vfd.print("RTC: RTC initalized!");
   } else {
     return -1;
   }
 
   if (rtc.lostPower()) {
     Serial.println("RTC: power loss detected, time set to default");
+    vfd.print("RTC: power loss detected, please set the time!");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
+
+  rtc.enableSecondTimer();
+
+  return 0;
+}
+
+void IRAM_ATTR gpsTimepulse() {
+  gpsPulseCount++;
+}
+
+void IRAM_ATTR rtcTimepulse() {
+  rtcPulseCount++;
+}
+
+int initializeIO() {
+  pinMode(ubxPPS, INPUT);
+  pinMode(rtcPPS, INPUT_PULLUP);
+
+  attachInterrupt(ubxPPS, gpsTimepulse, RISING);
+  attachInterrupt(rtcPPS, rtcTimepulse, FALLING);
 
   return 0;
 }
@@ -111,6 +138,7 @@ void setup() {
   Serial.printf("VFD: init status %d\n", initializeVFD());
   Serial.printf("GNSS: init status %d\n", initalizeGNSS());
   Serial.printf("RTC: init status %d\n", initalizeRTC());
+  Seria.printf("SYS: io init status %d\n", initalizeIO());
 
   Serial.println("SYS: Setting current time from RTC");
   now = rtc.now();
@@ -120,8 +148,10 @@ void setup() {
 void loop() {
 
   now = rtc.now();
-  vfd.print(formattedTimeString());
   vfd.setCursor(0, 0);
+  vfd.print(formattedTimeString());
+  vfd.setCursor(0, 1);
+  vfd.printf("RTC PPS: %d GPS PPS: %d\n", rtcPulseCount, gpsPulseCount);
   delay(100);
 
 }
