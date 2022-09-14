@@ -149,7 +149,7 @@ void loop() {
   vfd.setCursor(0, 0);
   vfd.print(formattedTimeString());
   vfd.setCursor(0, 1);
-  vfd.printf("RTC PPS: %d GPS PPS: %d", rtcPulseCount, gpsPulseCount);
+  vfd.printf("RTC: %d GPS: %d Fix Type: %d SIV: %d", rtcPulseCount, gpsPulseCount, ubxGNSS.getFixType(), ubxGNSS.getSIV());
   delay(100);
 
 }
