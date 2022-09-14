@@ -1,6 +1,7 @@
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 #include <LiquidCrystal.h>
 #include <RTClib.h>
+#include <TimeLib.h>
 
 #define ubxRX 16
 #define ubxTX 17
@@ -19,13 +20,12 @@ RTC_DS3231 rtc;
 SFE_UBLOX_GNSS ubxGNSS;
 LiquidCrystal vfd(vfdRS, vfdEN, vfdD4, vfdD5, vfdD6, vfdD7);
 
-DateTime now;
+volatile time_t currentTime;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
-volatile int rtcPulseCount = 0;
-volatile int gpsPulseCount = 0;
+bool useGpsPPS = false;
 
 int initializeVFD() {
   Serial.println("VFD: initializing");
@@ -36,7 +36,7 @@ int initializeVFD() {
   return 0;
 }
 
-int initalizeGNSS() {
+int initializeGNSS() {
   int initCount = 0;
   Serial.println("GNSS: initializing U-Blox GNSS module");
   while (initCount < 5) {
@@ -68,7 +68,7 @@ int initalizeGNSS() {
   }
 }
 
-int initalizeRTC() {
+int initializeRTC() {
   int initCount = 0;
   Serial.println("RTC: initializing DS3231");
   while (initCount < 5) {
@@ -81,7 +81,7 @@ int initalizeRTC() {
     }
   }
   if (initCount < 5) {
-    Serial.println("RTC: initalized successfully!");
+    Serial.println("RTC: initialized successfully!");
   } else {
     return -1;
   }
@@ -98,34 +98,39 @@ int initalizeRTC() {
 }
 
 void IRAM_ATTR gpsTimepulse() {
-  gpsPulseCount++;
+//  gpsPulseCount++;
 }
 
 void IRAM_ATTR rtcTimepulse() {
-  rtcPulseCount++;
+  currentTime++;
 }
 
-int initializeIO() {
+int initializeInterrupts(bool useGps) {
   pinMode(ubxPPS, INPUT);
   pinMode(rtcPPS, INPUT_PULLUP);
 
-  attachInterrupt(ubxPPS, gpsTimepulse, RISING);
-  attachInterrupt(rtcPPS, rtcTimepulse, FALLING);
+  if (useGps == true) {
+    detachInterrupt(rtcPPS);
+    attachInterrupt(ubxPPS, gpsTimepulse, RISING);
+  } else {
+    detachInterrupt(ubxPPS);
+    attachInterrupt(rtcPPS, rtcTimepulse, FALLING);
+  }
 
   return 0;
 }
 
 const char *formattedTimeString() {
   char *amPm;
-  if (now.hour() > 12) {
+  if (isPM(currentTime)) {
     amPm = "PM";
   } else {
     amPm = "AM";
   }
 
-  int numBytes = snprintf(NULL, 0, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month() - 1], now.day(), now.year(), now.twelveHour(), now.minute(), now.second(), amPm) + 1;
+  int numBytes = snprintf(NULL, 0, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[weekday(currentTime)], monthsOfTheYear[month(currentTime) - 1], day(currentTime), year(currentTime), hourFormat12(currentTime), minute(currentTime), second(currentTime), amPm) + 1;
   char *timeString = (char*)malloc(numBytes);
-  snprintf(timeString, numBytes, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[now.dayOfTheWeek()], monthsOfTheYear[now.month() - 1], now.day(), now.year(), now.twelveHour(), now.minute(), now.second(), amPm);
+  snprintf(timeString, numBytes, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[weekday(currentTime)], monthsOfTheYear[month(currentTime) - 1], day(currentTime), year(currentTime), hourFormat12(currentTime), minute(currentTime), second(currentTime), amPm);
 
   return timeString;
 }
@@ -134,22 +139,21 @@ void setup() {
   Serial.begin(115200);
   Serial.println("GPS VFD Clock Mk1");
   Serial.printf("VFD: init status %d\n", initializeVFD());
-  Serial.printf("GNSS: init status %d\n", initalizeGNSS());
-  Serial.printf("RTC: init status %d\n", initalizeRTC());
-  Serial.printf("SYS: io init status %d\n", initializeIO());
+  Serial.printf("GNSS: init status %d\n", initializeGNSS());
+  Serial.printf("RTC: init status %d\n", initializeRTC());
 
   Serial.println("SYS: Setting current time from RTC");
-  now = rtc.now();
+  currentTime = rtc.now().unixtime();
+  initializeInterrupts(false);
   Serial.printf("SYS: time is now %s\n", formattedTimeString());
 }
 
 void loop() {
 
-  now = rtc.now();
   vfd.setCursor(0, 0);
   vfd.print(formattedTimeString());
   vfd.setCursor(0, 1);
-  vfd.printf("RTC: %d GPS: %d Fix Type: %d SIV: %d", rtcPulseCount, gpsPulseCount, ubxGNSS.getFixType(), ubxGNSS.getSIV());
+  vfd.printf("Fix Type: %d SIV: %d", ubxGNSS.getFixType(), ubxGNSS.getSIV());
   delay(100);
 
 }
