@@ -25,14 +25,11 @@ volatile time_t currentTime;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
-bool useGpsPPS = false;
+bool usingGpsPPS = false;
 
 int initializeVFD() {
   Serial.println("VFD: initializing");
   vfd.begin(40, 2);
-  vfd.print("VFD Initialized!");
-  delay(1000);
-  vfd.clear();
   return 0;
 }
 
@@ -98,7 +95,7 @@ int initializeRTC() {
 }
 
 void IRAM_ATTR gpsTimepulse() {
-//  gpsPulseCount++;
+  currentTime++;
 }
 
 void IRAM_ATTR rtcTimepulse() {
@@ -112,9 +109,11 @@ int initializeInterrupts(bool useGps) {
   if (useGps == true) {
     detachInterrupt(rtcPPS);
     attachInterrupt(ubxPPS, gpsTimepulse, RISING);
+    Serial.println("SYS: using GPS timepulses");
   } else {
     detachInterrupt(ubxPPS);
     attachInterrupt(rtcPPS, rtcTimepulse, FALLING);
+    Serial.println("SYS: using RTC timepulses");
   }
 
   return 0;
@@ -128,16 +127,16 @@ const char *formattedTimeString() {
     amPm = "AM";
   }
 
-  int numBytes = snprintf(NULL, 0, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[weekday(currentTime)], monthsOfTheYear[month(currentTime) - 1], day(currentTime), year(currentTime), hourFormat12(currentTime), minute(currentTime), second(currentTime), amPm) + 1;
+  int numBytes = snprintf(NULL, 0, "%s %s %2d, %4d %02d:%02d:%02d %s", daysOfTheWeek[weekday(currentTime)], monthsOfTheYear[month(currentTime) - 1], day(currentTime), year(currentTime), hourFormat12(currentTime), minute(currentTime), second(currentTime), amPm) + 1;
   char *timeString = (char*)malloc(numBytes);
-  snprintf(timeString, numBytes, "%s %s %2d, %4d %2d:%2d:%2d %s", daysOfTheWeek[weekday(currentTime)], monthsOfTheYear[month(currentTime) - 1], day(currentTime), year(currentTime), hourFormat12(currentTime), minute(currentTime), second(currentTime), amPm);
+  snprintf(timeString, numBytes, "%s %s %2d, %4d %02d:%02d:%02d %s", daysOfTheWeek[weekday(currentTime)], monthsOfTheYear[month(currentTime) - 1], day(currentTime), year(currentTime), hourFormat12(currentTime), minute(currentTime), second(currentTime), amPm);
 
   return timeString;
 }
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("GPS VFD Clock Mk1");
+  Serial.println("SYS: VFD GPS Clock initializing...");
   Serial.printf("VFD: init status %d\n", initializeVFD());
   Serial.printf("GNSS: init status %d\n", initializeGNSS());
   Serial.printf("RTC: init status %d\n", initializeRTC());
@@ -145,15 +144,27 @@ void setup() {
   Serial.println("SYS: Setting current time from RTC");
   currentTime = rtc.now().unixtime();
   initializeInterrupts(false);
-  Serial.printf("SYS: time is now %s\n", formattedTimeString());
+  Serial.printf("SYS: time is now %s, RTC interrupts enabled\n", formattedTimeString());
 }
 
 void loop() {
+  char *timeSource;
 
   vfd.setCursor(0, 0);
   vfd.print(formattedTimeString());
   vfd.setCursor(0, 1);
-  vfd.printf("Fix Type: %d SIV: %d", ubxGNSS.getFixType(), ubxGNSS.getSIV());
-  delay(100);
 
+  if((ubxGNSS.getFixType() == 2 || ubxGNSS.getFixType() == 3) && !usingGpsPPS && ubxGNSS.getTimeValid()) {
+    timeSource = "GPS";
+    currentTime = ubxGNSS.getUnixEpoch();
+    rtc.adjust(DateTime(currentTime));
+    initializeInterrupts(true);
+  } else {
+    timeSource = "RTC";
+    initializeInterrupts(false);
+  }
+
+  vfd.printf("Fix Type: %d SIV: %d Time Source: %s", ubxGNSS.getFixType(), ubxGNSS.getSIV(), timeSource);
+
+  delay(100);
 }
