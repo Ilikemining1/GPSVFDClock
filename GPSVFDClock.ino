@@ -24,8 +24,12 @@ SFE_UBLOX_GNSS ubxGNSS;
 CU40025_VFD vfd(vfdRS, vfdEN, vfdD4, vfdD5, vfdD6, vfdD7);
 
 
-static char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-static char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+const char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+const char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+
+char displayBuffer[2][41];
+uint8_t displayBrightness = 4;
+SemaphoreHandle_t displayAccess;
 
 int8_t initializeVFD(void) {
   Serial.println("VFD: initializing");
@@ -98,6 +102,42 @@ int8_t initializeALS(void) {
   return 0;
 }
 
+void updateDisplay(void *thing) {
+
+  char oldDisplayValue[2][41];
+
+  while(true) {
+
+    if (displayAccess != NULL) {
+
+      if (xSemaphoreTake(displayAccess, 0) == pdTRUE) {
+
+        if (strncmp(displayBuffer[0], oldDisplayValue[0], sizeof(oldDisplayValue[0])) != 0) {
+
+          vfd.setCursor(0, 0);
+          vfd.write(displayBuffer[0]);
+          strncpy(oldDisplayValue[0], displayBuffer[0], sizeof(oldDisplayValue[0]));
+          
+        }
+
+        if (strncmp(displayBuffer[1], oldDisplayValue[1], sizeof(oldDisplayValue[1])) != 0) {
+
+          vfd.setCursor(0, 1);
+          vfd.write(displayBuffer[1]);
+          strncpy(oldDisplayValue[1], displayBuffer[1], sizeof(oldDisplayValue[1]));
+
+        } 
+
+        xSemaphoreGive(displayAccess);
+
+      }
+
+      vTaskDelay(30 / portTICK_PERIOD_MS);
+
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -105,18 +145,29 @@ void setup() {
   
   Serial.println("SYS: VFD GPS Clock initializing...");
   
-  if ((initializeVFD() + initializeGNSS() + initializeRTC() + initializeALS())) {
+  if (initializeVFD() + initializeGNSS() + initializeRTC() + initializeALS()) {
     Serial.println("SYS: hardware initialization failed, hanging now");
     vfd.print("Hardware Initialization Failure!");
     while(true);
   } else {
     Serial.println("SYS: hardware initialization complete");
-    vfd.print("GPS Clock with VFD\nPowered by U-blox and ESP32");
   }
-  
+
+  displayAccess = xSemaphoreCreateMutex();
+
+  xTaskCreate(updateDisplay, "Refresh Display Contents", 1000, NULL, 1, NULL);
 
 }
 
 void loop() {
+  
+ for (int i = 0; i < 40; i++) {
+  if (xSemaphoreTake(displayAccess, 10 / portTICK_PERIOD_MS) == pdTRUE) {
+    displayBuffer[0][0] = i + 32;
+    displayBuffer[1][i] = i + 16;    
+    xSemaphoreGive(displayAccess);
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+  }
+ }
  
 }
