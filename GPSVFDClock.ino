@@ -155,6 +155,7 @@ void updateTime(void *thing) {
   uint8_t prevFixType = 0;
   
   while(true) {
+    
     if (gnssFixType < 3) {
       
       if (prevFixType > 2) {
@@ -164,7 +165,8 @@ void updateTime(void *thing) {
 
       currentTime = rtc.now();
 
-      vTaskDelay(50 / portTICK_PERIOD_MS);
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+
     } else {
 
       if (prevFixType < 3) {
@@ -177,6 +179,7 @@ void updateTime(void *thing) {
         nextSecond = false;
       }
     }
+
   }
 }
 
@@ -187,11 +190,13 @@ void generateDisplay(void *thing) {
     if (displayAccess != NULL) {
 
        if (xSemaphoreTake(displayAccess, 0) == pdTRUE) {
+
          uint8_t numBytes = snprintf(NULL, 0, "%u/%u/%u %02u:%02u:%02u", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second()) + 1;
          char *timeString = (char*)malloc(numBytes);
          snprintf(timeString, numBytes, "%u/%u/%u %02u:%02u:%02u", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second());
-
          strncpy(displayBuffer[0], timeString, sizeof(displayBuffer[0]));
+
+         free(timeString);
 
          xSemaphoreGive(displayAccess);
 
@@ -230,12 +235,10 @@ void setup() {
   currentTime = rtc.now();
 
   xTaskCreate(updateDisplay, "Refresh Display Contents", 1000, NULL, 1, NULL);
-//  xTaskCreate(updateTime, "Monitor and Sync System Time", 1000, NULL, 2, NULL);
+  xTaskCreate(updateTime, "Monitor and Sync System Time", 4096, NULL, 1, NULL);
   xTaskCreate(generateDisplay, "Generate Strings for Display Output", 1000, NULL, 1, NULL);
 
 }
 
 void loop() {
-  currentTime = rtc.now();
-  vTaskDelay(10 / portTICK_PERIOD_MS);
 }
