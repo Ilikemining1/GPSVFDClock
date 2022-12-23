@@ -23,13 +23,21 @@ DFRobot_VEML7700 als;
 SFE_UBLOX_GNSS ubxGNSS;
 CU40025_VFD vfd(vfdRS, vfdEN, vfdD4, vfdD5, vfdD6, vfdD7);
 
-
 const char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const char monthsOfTheYear[12][12] = {"January", "Febuary", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
 char displayBuffer[2][41];
 uint8_t displayBrightness = 4;
 SemaphoreHandle_t displayAccess;
+
+uint8_t gnssFixType = 0;
+SemaphoreHandle_t gnssDataLock;
+
+volatile bool nextSecond = false;
+
+DateTime currentTime;
+
+// Initialization Code:
 
 int8_t initializeVFD(void) {
   Serial.println("VFD: initializing");
@@ -69,7 +77,7 @@ int8_t initializeGNSS(void) {
 }
 
 int8_t initializeRTC(void) {
-  int8_t initCount = 0;
+  uint8_t initCount = 0;
   Serial.println("RTC: initializing");
   while (initCount < 5) {
     if (!rtc.begin()) {
@@ -88,7 +96,6 @@ int8_t initializeRTC(void) {
 
   if (rtc.lostPower()) {
     Serial.println("RTC: power loss detected, time set to default.");
-    vfd.print("RTC: power loss detected, please set the time!");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
@@ -100,6 +107,12 @@ int8_t initializeALS(void) {
   als.begin();
 
   return 0;
+}
+
+// Interrupts and FreeRTOS Tasks:
+
+void ppsInterrupt(void) {
+  nextSecond = true;
 }
 
 void updateDisplay(void *thing) {
@@ -138,6 +151,64 @@ void updateDisplay(void *thing) {
   }
 }
 
+void updateTime(void *thing) {
+  uint8_t prevFixType = 0;
+  
+  while(true) {
+    if (gnssFixType < 3) {
+      
+      if (prevFixType > 2) {
+        detachInterrupt(ubxPPS);
+        prevFixType = gnssFixType; 
+      }
+
+      currentTime = rtc.now();
+
+      vTaskDelay(50 / portTICK_PERIOD_MS);
+    } else {
+
+      if (prevFixType < 3) {
+        attachInterrupt(ubxPPS, ppsInterrupt, RISING);
+        prevFixType = gnssFixType;
+      }
+
+      if (nextSecond) {
+        currentTime = DateTime(ubxGNSS.getUnixEpoch() + 1);
+        nextSecond = false;
+      }
+    }
+  }
+}
+
+void generateDisplay(void *thing) {
+  
+  while(true) { 
+
+    if (displayAccess != NULL) {
+
+       if (xSemaphoreTake(displayAccess, 0) == pdTRUE) {
+         uint8_t numBytes = snprintf(NULL, 0, "%u/%u/%u %02u:%02u:%02u", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second()) + 1;
+         char *timeString = (char*)malloc(numBytes);
+         snprintf(timeString, numBytes, "%u/%u/%u %02u:%02u:%02u", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second());
+
+         strncpy(displayBuffer[0], timeString, sizeof(displayBuffer[0]));
+
+         xSemaphoreGive(displayAccess);
+
+       }
+
+       vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    }
+
+  }
+
+}
+
+void updateGnss(void *thing) {
+
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -154,20 +225,17 @@ void setup() {
   }
 
   displayAccess = xSemaphoreCreateMutex();
+  gnssDataLock = xSemaphoreCreateMutex();
+
+  currentTime = rtc.now();
 
   xTaskCreate(updateDisplay, "Refresh Display Contents", 1000, NULL, 1, NULL);
+//  xTaskCreate(updateTime, "Monitor and Sync System Time", 1000, NULL, 2, NULL);
+  xTaskCreate(generateDisplay, "Generate Strings for Display Output", 1000, NULL, 1, NULL);
 
 }
 
 void loop() {
-  
- for (int i = 0; i < 40; i++) {
-  if (xSemaphoreTake(displayAccess, 10 / portTICK_PERIOD_MS) == pdTRUE) {
-    displayBuffer[0][0] = i + 32;
-    displayBuffer[1][i] = i + 16;    
-    xSemaphoreGive(displayAccess);
-    vTaskDelay(50 / portTICK_PERIOD_MS);
-  }
- }
- 
+  currentTime = rtc.now();
+  vTaskDelay(10 / portTICK_PERIOD_MS);
 }
