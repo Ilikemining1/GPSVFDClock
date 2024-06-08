@@ -31,9 +31,15 @@ uint8_t displayBrightness = 4;
 SemaphoreHandle_t displayAccess;
 
 uint8_t gnssFixType = 0;
+uint8_t gnssSIV = 0;
+int32_t gnssLatitude = 0;
+int32_t gnssLongitude = 0;
+uint64_t gnssEpoch = 0;
 SemaphoreHandle_t gnssDataLock;
 
 volatile bool nextSecond = false;
+
+char *timeSource = "RTC";
 
 DateTime currentTime;
 
@@ -160,7 +166,8 @@ void updateTime(void *thing) {
       
       if (prevFixType > 2) {
         detachInterrupt(ubxPPS);
-        prevFixType = gnssFixType; 
+        prevFixType = gnssFixType;
+        timeSource = "RTC"; 
       }
 
       currentTime = rtc.now();
@@ -172,14 +179,16 @@ void updateTime(void *thing) {
       if (prevFixType < 3) {
         attachInterrupt(ubxPPS, ppsInterrupt, RISING);
         prevFixType = gnssFixType;
+        timeSource = "GPS";
       }
 
       if (nextSecond) {
-        currentTime = DateTime(ubxGNSS.getUnixEpoch() + 1);
+        currentTime = DateTime(gnssEpoch + 1);
         nextSecond = false;
       }
-    }
 
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
   }
 }
 
@@ -191,9 +200,9 @@ void generateDisplay(void *thing) {
 
        if (xSemaphoreTake(displayAccess, 0) == pdTRUE) {
 
-         uint8_t numBytes = snprintf(NULL, 0, "%u/%u/%u %02u:%02u:%02u", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second()) + 1;
+         uint8_t numBytes = snprintf(NULL, 0, "%u/%u/%u %02u:%02u:%02u Time Source: %s", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second(), timeSource) + 1;
          char *timeString = (char*)malloc(numBytes);
-         snprintf(timeString, numBytes, "%u/%u/%u %02u:%02u:%02u", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second());
+         snprintf(timeString, numBytes, "%u/%u/%u %02u:%02u:%02u Time Source: %s", currentTime.month(), currentTime.day(), currentTime.year(), currentTime.hour(), currentTime.minute(), currentTime.second(), timeSource);
          strncpy(displayBuffer[0], timeString, sizeof(displayBuffer[0]));
 
          free(timeString);
@@ -211,6 +220,24 @@ void generateDisplay(void *thing) {
 }
 
 void updateGnss(void *thing) {
+
+  if (gnssDataLock != NULL) {
+
+    if(xSemaphoreTake(gnssDataLock, 0) == pdTRUE) {
+
+      gnssFixType = ubxGNSS.getFixType();
+      gnssSIV = ubxGNSS.getSIV();
+      gnssLatitude = ubxGNSS.getLatitude();
+      gnssLongitude = ubxGNSS.getLongitude();
+      gnssEpoch = ubxGNSS.getUnixEpoch();
+
+      xSemaphoreGive(gnssDataLock);
+      
+    }
+
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    
+  }
 
 }
 
@@ -236,9 +263,16 @@ void setup() {
 
   xTaskCreate(updateDisplay, "Refresh Display Contents", 1000, NULL, 1, NULL);
   xTaskCreate(updateTime, "Monitor and Sync System Time", 4096, NULL, 1, NULL);
-  xTaskCreate(generateDisplay, "Generate Strings for Display Output", 1000, NULL, 1, NULL);
+  xTaskCreate(generateDisplay, "Generate Strings for Display Output", 4096, NULL, 1, NULL);
+ // xTaskCreate(updateGnss, "Get GNSS Data", 4096, NULL, 1, NULL);
 
 }
 
 void loop() {
+  gnssFixType = ubxGNSS.getFixType();
+  gnssSIV = ubxGNSS.getSIV();
+  gnssLatitude = ubxGNSS.getLatitude();
+  gnssLongitude = ubxGNSS.getLongitude();
+  gnssEpoch = ubxGNSS.getUnixEpoch();
+  vTaskDelay(100 / portTICK_PERIOD_MS);
 }

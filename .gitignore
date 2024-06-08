@@ -2,3 +2,6 @@
 .vscode
 VFDClockFirmware/build
 sdkconfig
+.theia
+*.svd
+debug*
